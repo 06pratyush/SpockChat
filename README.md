@@ -1,6 +1,6 @@
 # SpockChat
 
-![SpockChat Logo](assets/logo.png)
+![SpockChat Logo](assets/logo_new.png)
 
 
 > **Local-first, peer-to-peer AI chat. Zero cloud. Zero latency. Infinite logic.**
