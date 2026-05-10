@@ -1,5 +1,8 @@
 # SpockChat
 
+![SpockChat Logo](assets/logo.png)
+
+
 > **Local-first, peer-to-peer AI chat. Zero cloud. Zero latency. Infinite logic.**
 
 [![Version](https://img.shields.io/badge/version-1.0.0-6C5CE7?style=flat-square)](https://github.com/YOUR_USERNAME/spockchat/releases/tag/v1.0.0)
