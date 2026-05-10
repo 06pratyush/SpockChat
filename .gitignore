@@ -1,0 +1,8 @@
+node_modules/
+.env
+spockchat.db
+spockchat.db-shm
+spockchat.db-wal
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpockChat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* =========================================
+       1. GLOBAL RULES & CSS VARIABLES
+       ========================================= */
+    :root {
+      --page-bg: #6C5CE7;
+      --bg-blob-1: #D62828;
+      --bg-blob-2: #00B894;
+      --glass-bg: rgba(255, 255, 255, 0.15);
+      --glass-bg-hover: rgba(255, 255, 255, 0.25);
+      --glass-bg-active: rgba(255, 255, 255, 0.30);
+      --glass-border: rgba(255, 255, 255, 0.35);
+      --text-primary: rgba(255, 255, 255, 0.92);
+      --text-secondary: rgba(255, 255, 255, 0.60);
+      --text-inverse: #0A0A0A;
+      --accent-red: #D62828;
+      --status-online: #22C55E;
+      --status-ai-active: #1D7FD4;
+      --msg-user: rgba(255, 255, 255, 0.25);
+      --msg-ai: rgba(29, 127, 212, 0.30);
+      --msg-group: rgba(255, 255, 255, 0.18);
+      --input-bg: rgba(255, 255, 255, 0.08);
+      --font-display: 'Barlow', sans-serif;
+      --font-body: 'Archivo', sans-serif;
+      --scale-h1: 32px;
+      --scale-h2: 24px;
+      --scale-h3: 18px;
+      --scale-body: 16px;
+      --scale-meta: 12px;
+      --scale-label: 11px;
+      --sp-xs: 4px;
+      --sp-sm: 8px;
+      --sp-md: 16px;
+      --sp-lg: 24px;
+      --sp-xl: 32px;
+      --sp-xxl: 48px;
+      --radius-sm: 12px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --radius-pill: 100px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-body);
+      background-color: var(--page-bg);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .bg-layer { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
+    .bg-blob { position: absolute; border-radius: 50%; filter: blur(40px); opacity: 0.6; }
+    .blob-1 { width: 600px; height: 600px; background: var(--bg-blob-1); top: -10%; right: -5%; }
+    .blob-2 { width: 400px; height: 400px; background: var(--bg-blob-2); bottom: -10%; left: -5%; }
+
+    /* =========================================
+       2. UTILITY & COMPONENT CLASSES
+       ========================================= */
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      color: var(--text-primary);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .glass-input {
+      background: var(--input-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      padding: var(--sp-md);
+      font-family: var(--font-body);
+      font-size: var(--scale-body);
+      width: 100%;
+      transition: background 0.2s;
+    }
+    .glass-input:focus { outline: none; background: rgba(255,255,255,0.25); border-color: rgba(255,255,255,0.6); }
+    .glass-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
+
+    .btn-primary {
+      background: var(--accent-red);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 12px var(--sp-lg);
+      font-family: var(--font-body);
+      font-size: var(--scale-label);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .label { font-size: var(--scale-label); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: var(--sp-xs); display: block; }
+    .meta { font-size: var(--scale-meta); color: var(--text-secondary); }
+    .touch-target { min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
+
+    @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+    .msg-enter { animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+    /* =========================================
+       3. AUTHENTICATION OVERLAY
+       ========================================= */
+    #auth-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(10, 10, 10, 0.7);
+      backdrop-filter: blur(24px);
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.4s, transform 0.4s;
+    }
+    .auth-box {
+      max-width: 440px; width: 100%;
+      padding: var(--sp-xxl);
+      gap: var(--sp-lg);
+    }
+    .auth-box h1 { font-family: var(--font-display); font-size: 40px; font-weight: 500; text-align: center; margin-bottom: var(--sp-sm); }
+    .auth-form { display: flex; flex-direction: column; gap: var(--sp-md); }
+    .auth-actions { display: flex; flex-direction: column; align-items: center; gap: var(--sp-md); margin-top: var(--sp-md); }
+    .auth-actions a { color: var(--text-secondary); font-size: var(--scale-meta); text-decoration: none; cursor: pointer; }
+    .auth-actions a:hover { color: var(--text-primary); text-decoration: underline; }
+    .auth-error { color: #ff6b6b; font-size: var(--scale-meta); text-align: center; display: none; }
+
+    /* =========================================
+       4. MAIN APP GRID LAYOUT
+       ========================================= */
+    #app-container {
+      width: 96vw; height: 92vh; max-width: 1400px;
+      display: grid; grid-template-columns: 280px 1fr 320px;
+      gap: var(--sp-lg); padding: var(--sp-lg);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.6s 0.2s;
+    }
+    #app-container.active { opacity: 1; pointer-events: auto; }
+
+    /* LEFT SIDEBAR */
+    .sidebar { padding: var(--sp-md); gap: var(--sp-md); }
+    .sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-xs) var(--sp-xs) var(--sp-md); }
+    .logo { font-family: var(--font-display); font-size: 28px; font-weight: 500; letter-spacing: -0.02em; }
+    .chat-list { flex: 1; display: flex; flex-direction: column; gap: var(--sp-sm); overflow-y: auto; padding-right: var(--sp-xs); }
+    .chat-item {
+      display: flex; align-items: center; gap: var(--sp-md);
+      padding: var(--sp-md); border-radius: var(--radius-md);
+      cursor: pointer; transition: background 0.2s;
+    }
+    .chat-item:hover { background: var(--glass-bg-hover); }
+    .chat-item.active { background: var(--glass-bg-active); border-left: 3px solid var(--accent-red); }
+    .avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--glass-border); display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 600; flex-shrink: 0;
+    }
+    .chat-info { flex: 1; overflow: hidden; }
+    .chat-name { font-size: var(--scale-body); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-preview { font-size: var(--scale-meta); color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* CENTER CHAT CANVAS */
+    .chat-canvas { padding: 0; display: flex; flex-direction: column; }
+    .canvas-header { padding: var(--sp-md) var(--sp-lg); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; min-height: 72px; }
+    .canvas-title { font-size: var(--scale-h2); font-weight: 500; }
+    .canvas-status { font-size: var(--scale-meta); color: var(--status-ai-active); display: flex; align-items: center; gap: 6px; }
+    .canvas-status::before { content: ''; width: 8px; height: 8px; background: var(--status-ai-active); border-radius: 50%; }
+    
+    .message-list { flex: 1; padding: var(--sp-lg); overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+    .msg-bubble {
+      max-width: 75%; padding: var(--sp-md) var(--sp-lg);
+      border-radius: var(--radius-md); line-height: 1.6; font-size: var(--scale-body);
+      position: relative;
+    }
+    .msg-bubble.user { align-self: flex-end; background: var(--msg-user); }
+    .msg-bubble.ai { align-self: flex-start; background: var(--msg-ai); border: 1px solid rgba(29,127,212,0.4); }
+    .msg-bubble.group { align-self: flex-start; background: var(--msg-group); }
+    .msg-meta { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; }
+    .msg-sender { font-size: var(--scale-meta); font-weight: 600; color: var(--status-online); }
+    .msg-time { font-size: 10px; color: var(--text-secondary); opacity: 0.8; }
+
+    .input-area { padding: var(--sp-md) var(--sp-lg); border-top: 1px solid var(--glass-border); display: flex; gap: var(--sp-md); align-items: flex-end; min-height: 80px; }
+    .tag-btn { background: none; border: 1px solid var(--glass-border); color: var(--text-primary); width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; }
+    .send-btn { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; }
+
+    /* RIGHT PANEL */
+    .info-panel { padding: var(--sp-md); gap: var(--sp-lg); }
+    .panel-section { display: flex; flex-direction: column; gap: var(--sp-sm); }
+    .member-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-md); }
+    .member-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .member-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--glass-bg-hover); display: flex; align-items: center; justify-content: center; font-size: 16px; position: relative; }
+    .member-avatar.empty { border: 1px dashed var(--glass-border); background: transparent; opacity: 0.6; cursor: pointer; }
+    .member-avatar.empty:hover { opacity: 1; }
+    .crown { position: absolute; top: -6px; right: -2px; font-size: 14px; }
+    
+    .ai-status-card { background: rgba(0,0,0,0.2); padding: var(--sp-md); border-radius: var(--radius-sm); border-left: 3px solid var(--status-ai-active); }
+    .ai-status-text { font-size: var(--scale-body); margin: 4px 0; }
+    .ai-load-bar { height: 4px; background: var(--input-bg); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+    .ai-load-fill { height: 100%; background: var(--status-ai-active); width: 0%; transition: width 1s ease; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-100px);
+      background: rgba(29, 127, 212, 0.25); backdrop-filter: blur(12px);
+      border: 1px solid var(--status-ai-active); color: #fff;
+      padding: 12px 24px; border-radius: var(--radius-pill); font-size: var(--scale-meta);
+      transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); z-index: 2000;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* TYPING INDICATOR */
+    .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 8px 0; }
+    .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); animation: pulse 1.2s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* RESPONSIVE */
+    @media (max-width: 1024px) {
+      #app-container { grid-template-columns: 280px 1fr; }
+      .info-panel { display: none; }
+    }
+    @media (max-width: 768px) {
+      #app-container { grid-template-columns: 1fr; padding: var(--sp-md); }
+      .sidebar { position: fixed; inset: 0; z-index: 100; transform: translateX(-100%); transition: transform 0.3s; padding-top: 60px; }
+      .sidebar.active { transform: translateX(0); }
+      .chat-canvas { width: 100%; border-radius: var(--radius-lg); }
+      .mobile-nav { display: flex; }
+    }
+    .mobile-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: var(--glass-bg); backdrop-filter: blur(20px); z-index: 90; align-items: center; justify-content: space-around; border-top: 1px solid var(--glass-border); }
+
+    /* =========================================
+       5. MODALS (added for backend integration)
+       ========================================= */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1500;
+      background: rgba(10, 10, 10, 0.6);
+      backdrop-filter: blur(24px);
+      display: none; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      max-width: 420px; width: 100%;
+      padding: var(--sp-xl);
+      gap: var(--sp-md);
+      animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-md); }
+    .modal-title { font-family: var(--font-display); font-size: var(--scale-h2); font-weight: 500; }
+    .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; padding: 4px; }
+    .modal-close:hover { color: var(--text-primary); }
+    .modal-form { display: flex; flex-direction: column; gap: var(--sp-md); }
+    .modal-error { color: #ff6b6b; font-size: var(--scale-meta); display: none; }
+    .modal-actions { display: flex; gap: var(--sp-sm); justify-content: flex-end; margin-top: var(--sp-sm); }
+    .btn-ghost { background: none; border: 1px solid var(--glass-border); color: var(--text-primary); border-radius: var(--radius-sm); padding: 10px var(--sp-lg); font-family: var(--font-body); font-size: var(--scale-label); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; }
+
+    /* Invite notification badge */
+    .invite-badge {
+      background: var(--accent-red); color: #fff;
+      border-radius: 50%; width: 18px; height: 18px;
+      font-size: 10px; font-weight: 700;
+      display: none; align-items: center; justify-content: center;
+      margin-left: 6px;
+    }
+    .invite-badge.visible { display: flex; }
+
+    /* Invite card */
+    .invite-card {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: var(--sp-md);
+      display: flex; flex-direction: column; gap: var(--sp-sm);
+    }
+    .invite-card-title { font-size: var(--scale-body); font-weight: 500; }
+    .invite-card-meta { font-size: var(--scale-meta); color: var(--text-secondary); }
+    .invite-actions { display: flex; gap: var(--sp-sm); margin-top: var(--sp-xs); }
+    .btn-accept { background: var(--status-online); color: #fff; border: none; border-radius: var(--radius-sm); padding: 6px 14px; font-size: var(--scale-label); font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; }
+    .btn-reject { background: none; border: 1px solid var(--glass-border); color: var(--text-secondary); border-radius: var(--radius-sm); padding: 6px 14px; font-size: var(--scale-label); font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* Select input styling */
+    .glass-select {
+      background: var(--input-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      padding: var(--sp-md);
+      font-family: var(--font-body);
+      font-size: var(--scale-body);
+      width: 100%;
+    }
+    .glass-select option { background: #3d3472; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+    .toggle { appearance: none; width: 40px; height: 22px; background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 11px; cursor: pointer; position: relative; transition: background 0.2s; }
+    .toggle:checked { background: var(--status-ai-active); border-color: var(--status-ai-active); }
+    .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left 0.2s; }
+    .toggle:checked::after { left: 20px; }
+
+    /* Empty state */
+    .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-md); opacity: 0.5; }
+    .empty-state-icon { font-size: 48px; }
+    .empty-state-text { font-size: var(--scale-body); text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="bg-layer">
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+  </div>
+
+  <!-- AUTHENTICATION -->
+  <div id="auth-overlay">
+    <div class="glass-panel auth-box msg-enter">
+      <h1>SpockChat</h1>
+      <p class="meta" style="text-align: center;">Local AI. Zero latency. Infinite logic.</p>
+      <p class="auth-error" id="auth-error"></p>
+      <form class="auth-form" id="login-form">
+        <div>
+          <label class="label">Identity</label>
+          <input type="text" class="glass-input" id="auth-username" placeholder="Username" required autocomplete="username">
+        </div>
+        <div>
+          <label class="label">Access Key</label>
+          <input type="password" class="glass-input" id="auth-password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div class="auth-actions">
+          <button type="submit" class="btn-primary touch-target" id="auth-submit-btn" style="width: 100%;">Initialize Session</button>
+          <a id="auth-toggle-link">New here? Create account</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <main id="app-container">
+    <!-- LEFT: Chat List -->
+    <aside class="glass-panel sidebar">
+      <div class="sidebar-header">
+        <span class="logo">SpockChat</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="touch-target" id="invites-btn" style="background: none; border: none; color: var(--text-primary); cursor: pointer; position: relative;" title="Invites">
+            ✉
+            <span class="invite-badge" id="invite-badge">0</span>
+          </button>
+          <button class="touch-target" id="add-friend-btn" style="background: none; border: none; color: var(--text-primary); cursor: pointer; font-size: 18px;" title="Add Friend">＋</button>
+        </div>
+      </div>
+      <input type="text" class="glass-input" id="chat-search" placeholder="Search chats...">
+      <div class="chat-list" id="chat-list">
+        <div class="empty-state">
+          <span class="empty-state-icon">💬</span>
+          <span class="empty-state-text">No chats yet. Create a group or start an AI chat.</span>
+        </div>
+      </div>
+      <button class="btn-primary" id="new-group-btn" style="width: 100%; margin-top: var(--sp-md);">+ New Group Chat</button>
+    </aside>
+
+    <!-- CENTER: Chat Canvas -->
+    <section class="glass-panel chat-canvas">
+      <div class="canvas-header">
+        <div>
+          <h2 class="canvas-title" id="chat-title">Select a chat</h2>
+          <span class="meta" id="chat-meta">—</span>
+        </div>
+        <div class="canvas-status" id="ai-status" style="display:none;">AI: Online</div>
+      </div>
+      
+      <div class="message-list" id="message-list">
+        <div class="empty-state">
+          <span class="empty-state-icon">⚡</span>
+          <span class="empty-state-text">Select a chat to start messaging</span>
+        </div>
+      </div>
+
+      <form class="input-area" id="msg-form">
+        <button type="button" class="tag-btn touch-target" id="ai-tag-btn" title="Tag AI">@</button>
+        <textarea class="glass-input" id="msg-input" placeholder="Message..." style="flex: 1; resize: none; max-height: 120px;" rows="1" disabled></textarea>
+        <button type="submit" class="btn-primary send-btn touch-target" disabled>→</button>
+      </form>
+    </section>
+
+    <!-- RIGHT: Group/AI Context -->
+    <aside class="glass-panel info-panel">
+      <div class="panel-section">
+        <h3 class="label">Group Context</h3>
+        <p class="meta" id="panel-context-desc">Select a chat to see details.</p>
+      </div>
+
+      <div class="panel-section">
+        <h3 class="label">Members</h3>
+        <div class="member-grid" id="member-grid"></div>
+        <button class="btn-ghost" id="invite-member-btn" style="display:none;margin-top:8px;">+ Invite Member</button>
+      </div>
+
+      <div class="panel-section">
+        <h3 class="label">Local AI Status</h3>
+        <div class="ai-status-card">
+          <span class="meta">Model</span>
+          <strong id="panel-ai-model" style="display: block; margin-bottom: 8px;">—</strong>
+          <span class="meta">Compute Load (Admin Machine)</span>
+          <div class="ai-load-bar"><div class="ai-load-fill" id="ai-load"></div></div>
+          <p class="meta" id="panel-ai-host" style="margin-top: 8px;">—</p>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3 class="label">Friends</h3>
+        <div id="friends-list" style="display:flex;flex-direction:column;gap:8px;max-height:120px;overflow-y:auto;"></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">SpockAI scanning context...</div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       MODALS (hidden by default, shown by JS)
+       ═══════════════════════════════════════════════════════════════════════ -->
+
+  <!-- New Group Chat Modal -->
+  <div class="modal-overlay" id="modal-new-group">
+    <div class="glass-panel modal-box">
+      <div class="modal-header">
+        <span class="modal-title">New Group Chat</span>
+        <button class="modal-close" data-close="modal-new-group">✕</button>
+      </div>
+      <div class="modal-form">
+        <div>
+          <label class="label">Group Name</label>
+          <input type="text" class="glass-input" id="ng-name" placeholder="e.g. Dev Squad Alpha" maxlength="64">
+        </div>
+        <div class="toggle-row">
+          <span style="font-size:var(--scale-body);">Enable AI (SpockAI)</span>
+          <input type="checkbox" class="toggle" id="ng-ai-enabled" checked>
+        </div>
+        <div id="ng-ai-options">
+          <div style="margin-bottom:8px;">
+            <label class="label">Ollama Model</label>
+            <select class="glass-select" id="ng-ai-model">
+              <option value="llama3">llama3</option>
+              <option value="mistral">mistral</option>
+              <option value="gemma">gemma</option>
+              <option value="phi3">phi3</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">Ollama Host</label>
+            <input type="text" class="glass-input" id="ng-ai-host" value="http://localhost:11434">
+          </div>
+        </div>
+        <p class="modal-error" id="ng-error"></p>
+        <div class="modal-actions">
+          <button class="btn-ghost" data-close="modal-new-group">Cancel</button>
+          <button class="btn-primary" id="ng-create-btn">Create Group</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Friend Modal -->
+  <div class="modal-overlay" id="modal-add-friend">
+    <div class="glass-panel modal-box">
+      <div class="modal-header">
+        <span class="modal-title">Add Friend</span>
+        <button class="modal-close" data-close="modal-add-friend">✕</button>
+      </div>
+      <div class="modal-form">
+        <p class="meta" style="margin-bottom:8px;">Enter your friend's SpockChat server address and username. They must have SpockChat running.</p>
+        <div>
+          <label class="label">Their Server Address</label>
+          <input type="text" class="glass-input" id="af-host" placeholder="http://192.168.1.x:3000">
+        </div>
+        <div>
+          <label class="label">Their Username</label>
+          <input type="text" class="glass-input" id="af-username" placeholder="username">
+        </div>
+        <p class="modal-error" id="af-error"></p>
+        <div class="modal-actions">
+          <button class="btn-ghost" data-close="modal-add-friend">Cancel</button>
+          <button class="btn-primary" id="af-send-btn">Send Request</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Invites Modal -->
+  <div class="modal-overlay" id="modal-invites">
+    <div class="glass-panel modal-box" style="max-width:480px;">
+      <div class="modal-header">
+        <span class="modal-title">Pending Invites</span>
+        <button class="modal-close" data-close="modal-invites">✕</button>
+      </div>
+      <div id="invites-list" style="display:flex;flex-direction:column;gap:12px;max-height:400px;overflow-y:auto;margin-top:8px;">
+        <p class="meta">No pending invites.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invite Member to Group Modal -->
+  <div class="modal-overlay" id="modal-invite-member">
+    <div class="glass-panel modal-box">
+      <div class="modal-header">
+        <span class="modal-title">Invite to Group</span>
+        <button class="modal-close" data-close="modal-invite-member">✕</button>
+      </div>
+      <div class="modal-form">
+        <p class="meta" style="margin-bottom:8px;">Invite a friend from your friends list.</p>
+        <div>
+          <label class="label">Friend Username</label>
+          <select class="glass-select" id="im-friend-select">
+            <option value="">— Select a friend —</option>
+          </select>
+        </div>
+        <p class="modal-error" id="im-error"></p>
+        <div class="modal-actions">
+          <button class="btn-ghost" data-close="modal-invite-member">Cancel</button>
+          <button class="btn-primary" id="im-invite-btn">Send Invite</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New 1v1 AI Chat Modal -->
+  <div class="modal-overlay" id="modal-new-ai-chat">
+    <div class="glass-panel modal-box">
+      <div class="modal-header">
+        <span class="modal-title">New AI Chat</span>
+        <button class="modal-close" data-close="modal-new-ai-chat">✕</button>
+      </div>
+      <div class="modal-form">
+        <div>
+          <label class="label">Chat Name</label>
+          <input type="text" class="glass-input" id="nac-name" placeholder="e.g. Research Assistant">
+        </div>
+        <div>
+          <label class="label">Ollama Model</label>
+          <select class="glass-select" id="nac-model">
+            <option value="llama3">llama3</option>
+            <option value="mistral">mistral</option>
+            <option value="gemma">gemma</option>
+            <option value="phi3">phi3</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Ollama Host</label>
+          <input type="text" class="glass-input" id="nac-host" value="http://localhost:11434">
+        </div>
+        <p class="modal-error" id="nac-error"></p>
+        <div class="modal-actions">
+          <button class="btn-ghost" data-close="modal-new-ai-chat">Cancel</button>
+          <button class="btn-primary" id="nac-create-btn">Create Chat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Socket.io client -->
+  <script src="/socket.io/socket.io.js"></script>
+
+  <script>
+    // ════════════════════════════════════════════════════════════════════════
+    // SPOCKCHAT CLIENT — BACKEND INTEGRATED
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ─── STATE ───────────────────────────────────────────────────────────────
+    const SC = {
+      token: localStorage.getItem('sc_token') || null,
+      user: JSON.parse(localStorage.getItem('sc_user') || 'null'),
+      activeChatId: null,
+      activeChat: null,
+      chats: [],
+      friends: [],
+      typingUsers: new Set(),
+      typingTimer: null,
+      socket: null,
+      isAIProcessing: false,
+      isRegisterMode: false,
+    };
+
+    // ─── DOM REFS ────────────────────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+    const authOverlay   = $('auth-overlay');
+    const appContainer  = $('app-container');
+    const chatListEl    = $('chat-list');
+    const messageListEl = $('message-list');
+    const memberGridEl  = $('member-grid');
+    const msgForm       = $('msg-form');
+    const msgInput      = $('msg-input');
+    const toastEl       = $('toast');
+    const aiLoadEl      = $('ai-load');
+
+    // ─── API HELPER ──────────────────────────────────────────────────────────
+    async function api(method, path, body) {
+      const opts = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(SC.token ? { Authorization: `Bearer ${SC.token}` } : {}),
+        },
+      };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(`/api${path}`, opts);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    // ─── TOAST ───────────────────────────────────────────────────────────────
+    function showToast(msg, duration = 3000) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      setTimeout(() => toastEl.classList.remove('show'), duration);
+    }
+
+    function formatTime(ts) {
+      const d = ts ? new Date(ts * 1000) : new Date();
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // AUTH
+    // ════════════════════════════════════════════════════════════════════════
+
+    const authToggleLink  = $('auth-toggle-link');
+    const authSubmitBtn   = $('auth-submit-btn');
+    const authErrorEl     = $('auth-error');
+
+    authToggleLink.addEventListener('click', () => {
+      SC.isRegisterMode = !SC.isRegisterMode;
+      if (SC.isRegisterMode) {
+        authToggleLink.textContent = 'Already have an account? Log in';
+        authSubmitBtn.textContent = 'Create Account';
+      } else {
+        authToggleLink.textContent = 'New here? Create account';
+        authSubmitBtn.textContent = 'Initialize Session';
+      }
+      authErrorEl.style.display = 'none';
+    });
+
+    $('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = $('auth-username').value.trim();
+      const password = $('auth-password').value;
+      authErrorEl.style.display = 'none';
+
+      try {
+        const endpoint = SC.isRegisterMode ? '/auth/register' : '/auth/login';
+        const data = await api('POST', endpoint, { username, password });
+        SC.token = data.token;
+        SC.user = data.user;
+        localStorage.setItem('sc_token', SC.token);
+        localStorage.setItem('sc_user', JSON.stringify(SC.user));
+        bootApp();
+      } catch (err) {
+        authErrorEl.textContent = err.message;
+        authErrorEl.style.display = 'block';
+      }
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // BOOT
+    // ════════════════════════════════════════════════════════════════════════
+
+    async function bootApp() {
+      // Validate token
+      try {
+        await api('GET', '/auth/me');
+      } catch {
+        SC.token = null;
+        SC.user = null;
+        localStorage.removeItem('sc_token');
+        localStorage.removeItem('sc_user');
+        return;
+      }
+
+      // Hide auth, show app
+      authOverlay.style.opacity = '0';
+      setTimeout(() => {
+        authOverlay.style.display = 'none';
+        appContainer.classList.add('active');
+      }, 400);
+
+      // Load initial data
+      await Promise.all([loadChats(), loadFriends()]);
+      await loadPendingInvites();
+
+      // Connect socket
+      connectSocket();
+    }
+
+    // Auto-boot if token exists
+    if (SC.token && SC.user) {
+      bootApp();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // SOCKET
+    // ════════════════════════════════════════════════════════════════════════
+
+    function connectSocket() {
+      SC.socket = io({ auth: { token: SC.token } });
+
+      SC.socket.on('connect', () => {
+        // Join all chat rooms
+        if (SC.chats.length > 0) {
+          SC.socket.emit('chats:join', { chatIds: SC.chats.map(c => c.id) });
+        }
+      });
+
+      SC.socket.on('message:new', ({ message }) => {
+        if (message.chat_id === SC.activeChatId) {
+          appendMessage(message);
+        }
+        // Update preview in sidebar
+        updateChatPreview(message.chat_id, message.sender_username + ': ' + message.content);
+      });
+
+      SC.socket.on('typing:update', ({ username, isTyping }) => {
+        if (isTyping) {
+          SC.typingUsers.add(username);
+        } else {
+          SC.typingUsers.delete(username);
+        }
+        renderTypingIndicator();
+      });
+
+      SC.socket.on('ai:thinking', ({ chatId }) => {
+        if (chatId === SC.activeChatId) {
+          SC.isAIProcessing = true;
+          showToast('SpockAI scanning context...', 60000);
+          aiLoadEl.style.width = '80%';
+          showAITyping();
+        }
+      });
+
+      SC.socket.on('ai:done', ({ chatId }) => {
+        if (chatId === SC.activeChatId) {
+          SC.isAIProcessing = false;
+          toastEl.classList.remove('show');
+          aiLoadEl.style.width = '15%';
+          removeAITyping();
+        }
+      });
+
+      SC.socket.on('ai:error', ({ chatId, error }) => {
+        if (chatId === SC.activeChatId) {
+          SC.isAIProcessing = false;
+          toastEl.classList.remove('show');
+          aiLoadEl.style.width = '0%';
+          removeAITyping();
+          showToast('AI error: ' + error, 4000);
+        }
+      });
+
+      SC.socket.on('member:joined', async ({ chatId }) => {
+        if (chatId === SC.activeChatId) await loadActiveChatDetails();
+      });
+
+      SC.socket.on('invite:received', ({ invite }) => {
+        showToast(`Invite to "${invite.chat_name}" from ${invite.inviter_username}`);
+        loadPendingInvites();
+      });
+
+      SC.socket.on('friend:request', ({ fromUsername }) => {
+        showToast(`Friend request from ${fromUsername}`);
+        loadFriends();
+      });
+
+      SC.socket.on('disconnect', () => {
+        console.log('[Socket] Disconnected');
+      });
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CHATS — LOAD & RENDER
+    // ════════════════════════════════════════════════════════════════════════
+
+    async function loadChats() {
+      try {
+        const data = await api('GET', '/chats');
+        SC.chats = data.chats;
+        renderChatList();
+      } catch (err) {
+        console.error('loadChats:', err);
+      }
+    }
+
+    function renderChatList() {
+      const query = $('chat-search').value.toLowerCase();
+      const filtered = SC.chats.filter(c => c.name.toLowerCase().includes(query));
+
+      if (filtered.length === 0) {
+        chatListEl.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-state-icon">💬</span>
+            <span class="empty-state-text">${query ? 'No chats match your search.' : 'No chats yet. Create a group or start an AI chat.'}</span>
+          </div>`;
+        return;
+      }
+
+      chatListEl.innerHTML = filtered.map(chat => `
+        <div class="chat-item ${chat.id === SC.activeChatId ? 'active' : ''}" data-id="${chat.id}">
+          <div class="avatar">${chat.name.charAt(0).toUpperCase()}</div>
+          <div class="chat-info">
+            <div class="chat-name">${escHtml(chat.name)}</div>
+            <div class="chat-preview">${escHtml(chat.last_message || (chat.type === '1v1' ? '1v1 AI Chat' : `${chat.member_count} members`))}</div>
+          </div>
+        </div>
+      `).join('');
+
+      chatListEl.querySelectorAll('.chat-item').forEach(el => {
+        el.addEventListener('click', () => selectChat(el.dataset.id));
+      });
+    }
+
+    function updateChatPreview(chatId, preview) {
+      const idx = SC.chats.findIndex(c => c.id === chatId);
+      if (idx >= 0) {
+        SC.chats[idx].last_message = preview;
+        renderChatList();
+      }
+    }
+
+    $('chat-search').addEventListener('input', renderChatList);
+
+    // ─── SELECT CHAT ─────────────────────────────────────────────────────────
+
+    async function selectChat(chatId) {
+      SC.activeChatId = chatId;
+      SC.activeChat = SC.chats.find(c => c.id === chatId);
+      renderChatList();
+
+      // Join socket room
+      SC.socket?.emit('chat:join', { chatId });
+
+      // Enable input
+      msgInput.disabled = false;
+      msgForm.querySelector('button[type=submit]').disabled = false;
+
+      // Update header
+      $('chat-title').textContent = SC.activeChat?.name || 'Chat';
+
+      await loadActiveChatDetails();
+      await loadMessages(chatId);
+    }
+
+    async function loadActiveChatDetails() {
+      if (!SC.activeChatId) return;
+      try {
+        const data = await api('GET', `/chats/${SC.activeChatId}`);
+        SC.activeChat = data.chat;
+        renderRightPanel(data.chat, data.members);
+      } catch (err) {
+        console.error('loadActiveChatDetails:', err);
+      }
+    }
+
+    function renderRightPanel(chat, members) {
+      // Header meta
+      $('chat-meta').textContent = chat.type === '1v1'
+        ? '1v1 AI Chat'
+        : `${members.length} member${members.length !== 1 ? 's' : ''} • ${chat.ai_enabled ? '1 AI attached' : 'AI disabled'}`;
+
+      // AI status
+      const aiStatusEl = $('ai-status');
+      if (chat.ai_enabled) {
+        aiStatusEl.style.display = 'flex';
+        aiStatusEl.textContent = 'AI: Online';
+      } else {
+        aiStatusEl.style.display = 'none';
+      }
+
+      // Context description
+      $('panel-context-desc').textContent = chat.ai_enabled
+        ? 'Context retention enabled. Tag @AI to query.'
+        : 'AI is disabled for this chat.';
+
+      // AI info
+      $('panel-ai-model').textContent = chat.ai_model || '—';
+      $('panel-ai-host').textContent = chat.ai_host || '—';
+
+      // Members grid
+      const slots = Array(5).fill(null).map((_, i) => members[i] || null);
+      memberGridEl.innerHTML = slots.map(m => m ? `
+        <div class="member-slot">
+          <div class="member-avatar">
+            ${m.username.charAt(0).toUpperCase()}
+            ${m.is_admin ? '<span class="crown">👑</span>' : ''}
+          </div>
+          <span class="meta">${escHtml(m.username)}</span>
+        </div>
+      ` : `
+        <div class="member-slot">
+          <div class="member-avatar empty" title="Invite member">+</div>
+          <span class="meta">Empty</span>
+        </div>
+      `).join('');
+
+      // Invite button: show only for group chats where user is admin
+      const isAdmin = members.some(m => m.user_id === SC.user.id && m.is_admin);
+      const inviteBtn = $('invite-member-btn');
+      if (chat.type === 'group' && isAdmin && members.length < 5) {
+        inviteBtn.style.display = 'block';
+      } else {
+        inviteBtn.style.display = 'none';
+      }
+
+      // Empty slot click → invite
+      memberGridEl.querySelectorAll('.member-avatar.empty').forEach(el => {
+        el.addEventListener('click', () => {
+          if (chat.type === 'group' && isAdmin) openModal('modal-invite-member');
+        });
+      });
+    }
+
+    // ─── MESSAGES ────────────────────────────────────────────────────────────
+
+    async function loadMessages(chatId) {
+      try {
+        const data = await api('GET', `/chats/${chatId}/messages`);
+        messageListEl.innerHTML = '';
+        if (data.messages.length === 0) {
+          messageListEl.innerHTML = `
+            <div class="empty-state">
+              <span class="empty-state-icon">⚡</span>
+              <span class="empty-state-text">No messages yet. Say hello!</span>
+            </div>`;
+          return;
+        }
+        data.messages.forEach(msg => appendMessage(msg, false));
+        messageListEl.scrollTop = messageListEl.scrollHeight;
+      } catch (err) {
+        console.error('loadMessages:', err);
+      }
+    }
+
+    function appendMessage(msg, animate = true) {
+      // Remove empty state if present
+      const emptyState = messageListEl.querySelector('.empty-state');
+      if (emptyState) emptyState.remove();
+
+      const isMe = msg.sender_username === SC.user?.username;
+      const isAI = msg.type === 'ai' || msg.sender_username === 'SpockAI';
+      const bubbleClass = isAI ? 'ai' : (isMe ? 'user' : 'group');
+
+      const div = document.createElement('div');
+      div.className = `msg-bubble ${bubbleClass}${animate ? ' msg-enter' : ''}`;
+      div.innerHTML = `
+        <div class="msg-content">${escHtml(msg.content)}</div>
+        <div class="msg-meta">
+          ${isAI
+            ? `<span class="meta" style="color:var(--status-ai-active)">⚡ Local Model</span>`
+            : `<span class="msg-sender">${escHtml(msg.sender_username)}</span>`
+          }
+          <span class="msg-time">${formatTime(msg.created_at)}</span>
+        </div>
+      `;
+      messageListEl.appendChild(div);
+      messageListEl.scrollTop = messageListEl.scrollHeight;
+    }
+
+    // ─── TYPING INDICATOR ────────────────────────────────────────────────────
+
+    let typingIndicatorEl = null;
+    let aiTypingEl = null;
+
+    function renderTypingIndicator() {
+      if (typingIndicatorEl) typingIndicatorEl.remove();
+      if (SC.typingUsers.size === 0) return;
+
+      typingIndicatorEl = document.createElement('div');
+      typingIndicatorEl.className = 'msg-bubble group';
+      typingIndicatorEl.style.padding = '12px 16px';
+      const names = [...SC.typingUsers].join(', ');
+      typingIndicatorEl.innerHTML = `
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+        <span class="meta">${escHtml(names)} ${SC.typingUsers.size === 1 ? 'is' : 'are'} typing...</span>
+      `;
+      messageListEl.appendChild(typingIndicatorEl);
+      messageListEl.scrollTop = messageListEl.scrollHeight;
+    }
+
+    function showAITyping() {
+      if (aiTypingEl) return;
+      aiTypingEl = document.createElement('div');
+      aiTypingEl.className = 'msg-bubble ai';
+      aiTypingEl.style.padding = '12px 16px';
+      aiTypingEl.innerHTML = `
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+        <span class="meta" style="color:var(--status-ai-active)">SpockAI is analyzing context...</span>
+      `;
+      messageListEl.appendChild(aiTypingEl);
+      messageListEl.scrollTop = messageListEl.scrollHeight;
+    }
+
+    function removeAITyping() {
+      if (aiTypingEl) { aiTypingEl.remove(); aiTypingEl = null; }
+    }
+
+    // ─── SEND MESSAGE ────────────────────────────────────────────────────────
+
+    msgForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const content = msgInput.value.trim();
+      if (!content || !SC.activeChatId) return;
+
+      SC.socket?.emit('message:send', { chatId: SC.activeChatId, content });
+      SC.socket?.emit('typing:stop', { chatId: SC.activeChatId });
+      msgInput.value = '';
+      msgInput.style.height = 'auto';
+    });
+
+    // Typing events
+    msgInput.addEventListener('input', function () {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight) + 'px';
+      if (this.value === '') this.style.height = 'auto';
+
+      if (!SC.activeChatId) return;
+      SC.socket?.emit('typing:start', { chatId: SC.activeChatId });
+      clearTimeout(SC.typingTimer);
+      SC.typingTimer = setTimeout(() => {
+        SC.socket?.emit('typing:stop', { chatId: SC.activeChatId });
+      }, 2000);
+    });
+
+    // @ tag button — inserts @AI into input
+    $('ai-tag-btn').addEventListener('click', () => {
+      if (!SC.activeChat?.ai_enabled) {
+        showToast('AI is not enabled in this chat');
+        return;
+      }
+      msgInput.value = (msgInput.value + ' @AI ').trimStart();
+      msgInput.focus();
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // FRIENDS
+    // ════════════════════════════════════════════════════════════════════════
+
+    async function loadFriends() {
+      try {
+        const data = await api('GET', '/friends');
+        SC.friends = data.friends;
+        renderFriendsList();
+        populateFriendSelect();
+      } catch (err) {
+        console.error('loadFriends:', err);
+      }
+    }
+
+    function renderFriendsList() {
+      const container = $('friends-list');
+      if (SC.friends.length === 0) {
+        container.innerHTML = `<p class="meta">No friends yet. Add one with the + button.</p>`;
+        return;
+      }
+      container.innerHTML = SC.friends.map(f => `
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="avatar" style="width:28px;height:28px;font-size:11px;">${f.friend_username.charAt(0).toUpperCase()}</div>
+          <span style="font-size:var(--scale-meta);">${escHtml(f.friend_username)}</span>
+          <span class="meta" style="margin-left:auto;">${f.friend_host.replace('http://', '').split(':')[0]}</span>
+        </div>
+      `).join('');
+    }
+
+    function populateFriendSelect() {
+      const sel = $('im-friend-select');
+      sel.innerHTML = '<option value="">— Select a friend —</option>' +
+        SC.friends.map(f => `<option value="${f.friend_username}">${escHtml(f.friend_username)}</option>`).join('');
+    }
+
+    // Add friend
+    $('af-send-btn').addEventListener('click', async () => {
+      const host = $('af-host').value.trim();
+      const username = $('af-username').value.trim();
+      const errEl = $('af-error');
+      errEl.style.display = 'none';
+
+      if (!host || !username) {
+        errEl.textContent = 'Both fields required.';
+        errEl.style.display = 'block';
+        return;
+      }
+      try {
+        await api('POST', '/friends/add', { peerHost: host, peerUsername: username });
+        closeModal('modal-add-friend');
+        showToast(`Friend request sent to ${username}`);
+        $('af-host').value = '';
+        $('af-username').value = '';
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      }
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // INVITES
+    // ════════════════════════════════════════════════════════════════════════
+
+    async function loadPendingInvites() {
+      try {
+        const data = await api('GET', '/chats/invites/pending');
+        const invites = data.invites;
+        const badge = $('invite-badge');
+        if (invites.length > 0) {
+          badge.textContent = invites.length;
+          badge.classList.add('visible');
+        } else {
+          badge.classList.remove('visible');
+        }
+        renderInvitesList(invites);
+      } catch (err) {
+        console.error('loadPendingInvites:', err);
+      }
+    }
+
+    function renderInvitesList(invites) {
+      const container = $('invites-list');
+      if (!invites || invites.length === 0) {
+        container.innerHTML = `<p class="meta">No pending invites.</p>`;
+        return;
+      }
+      container.innerHTML = invites.map(inv => `
+        <div class="invite-card" data-id="${inv.id}">
+          <div class="invite-card-title">${escHtml(inv.chat_name)}</div>
+          <div class="invite-card-meta">From ${escHtml(inv.inviter_username)}</div>
+          <div class="invite-actions">
+            <button class="btn-accept" data-accept="${inv.id}">Accept</button>
+            <button class="btn-reject" data-reject="${inv.id}">Decline</button>
+          </div>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('[data-accept]').forEach(btn => {
+        btn.addEventListener('click', () => respondToInvite(btn.dataset.accept, 'accept'));
+      });
+      container.querySelectorAll('[data-reject]').forEach(btn => {
+        btn.addEventListener('click', () => respondToInvite(btn.dataset.reject, 'reject'));
+      });
+    }
+
+    async function respondToInvite(inviteId, action) {
+      try {
+        await api('POST', `/chats/invites/${inviteId}/respond`, { action });
+        showToast(action === 'accept' ? 'Joined the group!' : 'Invite declined');
+        await loadPendingInvites();
+        if (action === 'accept') {
+          await loadChats();
+        }
+        closeModal('modal-invites');
+      } catch (err) {
+        showToast('Error: ' + err.message, 3000);
+      }
+    }
+
+    // Invite member to group
+    $('im-invite-btn').addEventListener('click', async () => {
+      const username = $('im-friend-select').value;
+      const errEl = $('im-error');
+      errEl.style.display = 'none';
+
+      if (!username) {
+        errEl.textContent = 'Please select a friend.';
+        errEl.style.display = 'block';
+        return;
+      }
+      try {
+        await api('POST', `/chats/${SC.activeChatId}/invite`, { inviteeUsername: username });
+        showToast(`Invite sent to ${username}`);
+        closeModal('modal-invite-member');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      }
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CREATE CHATS
+    // ════════════════════════════════════════════════════════════════════════
+
+    // New Group Chat
+    $('ng-create-btn').addEventListener('click', async () => {
+      const name = $('ng-name').value.trim();
+      const aiEnabled = $('ng-ai-enabled').checked;
+      const aiModel = $('ng-ai-model').value;
+      const aiHost = $('ng-ai-host').value.trim();
+      const errEl = $('ng-error');
+      errEl.style.display = 'none';
+
+      if (!name) {
+        errEl.textContent = 'Group name is required.';
+        errEl.style.display = 'block';
+        return;
+      }
+      try {
+        const data = await api('POST', '/chats', { name, type: 'group', aiEnabled, aiModel, aiHost });
+        SC.chats.unshift(data.chat);
+        renderChatList();
+        closeModal('modal-new-group');
+        selectChat(data.chat.id);
+        $('ng-name').value = '';
+        showToast(`Group "${name}" created!`);
+        SC.socket?.emit('chats:join', { chatIds: [data.chat.id] });
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      }
+    });
+
+    // Toggle AI options visibility
+    $('ng-ai-enabled').addEventListener('change', function () {
+      $('ng-ai-options').style.display = this.checked ? 'block' : 'none';
+    });
+
+    // New 1v1 AI Chat
+    $('nac-create-btn').addEventListener('click', async () => {
+      const name = $('nac-name').value.trim() || 'AI Assistant';
+      const aiModel = $('nac-model').value;
+      const aiHost = $('nac-host').value.trim();
+      const errEl = $('nac-error');
+      errEl.style.display = 'none';
+
+      try {
+        const data = await api('POST', '/chats', { name, type: '1v1', aiEnabled: true, aiModel, aiHost });
+        SC.chats.unshift(data.chat);
+        renderChatList();
+        closeModal('modal-new-ai-chat');
+        selectChat(data.chat.id);
+        $('nac-name').value = '';
+        showToast(`AI chat "${name}" started!`);
+        SC.socket?.emit('chats:join', { chatIds: [data.chat.id] });
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      }
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // MODAL SYSTEM
+    // ════════════════════════════════════════════════════════════════════════
+
+    function openModal(id) {
+      $(id).classList.add('open');
+    }
+
+    function closeModal(id) {
+      $(id).classList.remove('open');
+    }
+
+    // Wire up open buttons
+    $('new-group-btn').addEventListener('click', () => openModal('modal-new-group'));
+    $('add-friend-btn').addEventListener('click', () => openModal('modal-add-friend'));
+    $('invites-btn').addEventListener('click', () => openModal('modal-invites'));
+    $('invite-member-btn').addEventListener('click', () => openModal('modal-invite-member'));
+
+    // Close buttons
+    document.querySelectorAll('[data-close]').forEach(btn => {
+      btn.addEventListener('click', () => closeModal(btn.dataset.close));
+    });
+
+    // Click outside modal to close
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('open');
+      });
+    });
+
+    // Sidebar menu (☰) — for right-clicking to reveal AI chat option
+    document.querySelector('.sidebar-header button[title="Menu"]')?.addEventListener('click', () => {
+      openModal('modal-new-ai-chat');
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // UTILITY
+    // ════════════════════════════════════════════════════════════════════════
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Keyboard shortcut: Escape closes modals
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+      }
+    });
+
+    // Enter sends message (Shift+Enter for newline)
+    msgInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        msgForm.dispatchEvent(new Event('submit'));
+      }
+    });
+  </script>
+</body>
+</html>

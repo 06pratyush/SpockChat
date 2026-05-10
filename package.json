@@ -1,0 +1,23 @@
+{
+  "name": "spockchat",
+  "version": "1.0.0",
+  "description": "Local-first P2P AI chat web application with Ollama integration",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node --experimental-sqlite server/index.js",
+    "dev": "node --experimental-sqlite --watch server/index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^2.7.0",
+    "socket.io": "^4.7.2",
+    "uuid": "^9.0.0"
+  },
+  "engines": { "node": ">=22.5.0" },
+  "keywords": ["ai", "chat", "local", "ollama", "p2p"],
+  "license": "MIT"
+}
