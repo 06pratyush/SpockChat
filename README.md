@@ -5,14 +5,26 @@
 
 > **Local-first, peer-to-peer AI chat. Zero cloud. Zero latency. Infinite logic.**
 
-[![Version](https://img.shields.io/badge/version-1.0.0-6C5CE7?style=flat-square)](https://github.com/YOUR_USERNAME/spockchat/releases/tag/v1.0.0)
+[![Version](https://img.shields.io/badge/version-2.1.1-6C5CE7?style=flat-square)](https://github.com/YOUR_USERNAME/spockchat/releases/tag/v2.1.1)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-D62828?style=flat-square)](https://www.gnu.org/licenses/agpl-3.0)
 [![Node](https://img.shields.io/badge/Node.js-22%2B-22C55E?style=flat-square)](https://nodejs.org)
 [![Ollama](https://img.shields.io/badge/Ollama-compatible-1D7FD4?style=flat-square)](https://ollama.com)
+[![Security](https://img.shields.io/badge/vulnerabilities-0-22C55E?style=flat-square)](#security-notes)
 
-SpockChat lets you run group chats and 1v1 AI conversations entirely on your own hardware. No accounts, no servers, no data leaving your machine. Every message is local. Every AI call goes to your own Ollama instance. The only thing shared is your local network IP.
+SpockChat lets you run group chats and 1v1 AI conversations entirely on your own hardware. No accounts, no servers, no data leaving your machine. Every message is local. Every AI call goes to your own Ollama instance. The only thing shared is your local network IP — or a temporary tunnel URL if you choose to go public.
 
-**This is v1.0.0 — the foundation release.** Active development is ongoing. Feature patches and version updates are coming soon. See the [Roadmap](#roadmap) section for what's next.
+**Latest: v2.1.1** — cross-network tunneling built in, zero audit vulnerabilities. Active development is ongoing. See the [Roadmap](#roadmap) and [Changelog](#changelog) for what's new and what's next.
+
+---
+
+## What's New in v2.1.1
+
+- **🌐 One-click cross-network tunneling** — click the globe icon in the sidebar, get a public HTTPS URL instantly. Share it with anyone on any network. Powered by SSH — no npm packages, no accounts.
+- **🔒 Zero audit vulnerabilities** — removed `localtunnel` and all its deprecated transitive dependencies (`request`, `axios`, `hawk`, `boom`, `hoek`). `npm audit` now reports 0 vulnerabilities.
+- **Better error messages** — friend-add failures now include specific hints (expired tunnel URL, firewall blocking, wrong IP range, SSH not found).
+- **Automatic port fallback** — tunnel tries port 22 first, automatically retries on port 443 if blocked by a firewall.
+
+See the full [Changelog](#changelog) for version history.
 
 ---
 
@@ -22,8 +34,9 @@ SpockChat lets you run group chats and 1v1 AI conversations entirely on your own
 - **Group Chat** — up to 5 humans sharing one AI model per group
 - **@AI mentions** — tag the AI mid-conversation for context-aware answers; it reads the last 40 messages before responding
 - **Real-time messaging** — Socket.io, no polling
+- **🌐 Built-in public tunnel** — one click to expose your server across any network via SSH reverse tunnel; no port forwarding, no account
 - **Peer-to-peer networking** — each machine runs its own server and connects to others by IP
-- **Friend system** — add friends by their server address, send and accept invites
+- **Friend system** — add friends by their server address (LAN or tunnel URL), send and accept invites
 - **Local auth** — bcrypt-hashed passwords, JWT sessions, nothing stored remotely
 - **Persistent chat history** — SQLite, survives restarts
 - **Glassmorphism UI** — clean, no-framework frontend
@@ -34,8 +47,8 @@ SpockChat lets you run group chats and 1v1 AI conversations entirely on your own
 
 ### Option A — Download the release zip (no git required)
 
-1. Go to the [Releases page](https://github.com/YOUR_USERNAME/spockchat/releases/tag/v1.0.0)
-2. Under **Assets**, download `spockchat-v1.0.0.zip`
+1. Go to the [Releases page](https://github.com/YOUR_USERNAME/spockchat/releases/tag/v2.1.1)
+2. Under **Assets**, download `spockchat-v2.1.1.zip`
 3. Unzip it anywhere on your machine
 4. Open a terminal in the unzipped folder and follow the setup steps below
 
@@ -55,8 +68,11 @@ cd spockchat
 | Node.js | **22.5 or higher** | [nodejs.org](https://nodejs.org) |
 | Ollama | Latest | [ollama.com](https://ollama.com) |
 | A local LLM | any | `ollama pull llama3` |
+| OpenSSH Client | built-in | Windows: Settings → Apps → Optional Features → OpenSSH Client |
 
 > **Why Node 22.5+?** SpockChat uses the built-in `node:sqlite` module introduced in Node 22.5. No native compilation, no build tools needed.
+
+> **Why OpenSSH?** The cross-network tunnel (🌐 button) uses your system's SSH client to create a reverse tunnel. SSH is built into Windows 10 1803+, macOS, and all Linux distros. No extra install needed on most machines.
 
 ---
 
@@ -111,10 +127,11 @@ You'll see:
 
 ```
 ╔══════════════════════════════════════════╗
-║             SpockChat v1.0.0             ║
+║           SpockChat v2.1.1               ║
 ╠══════════════════════════════════════════╣
 ║  Local:    http://localhost:3000         ║
 ║  Network:  http://192.168.1.42:3000      ║
+║  Public:   Click 🌐 in the sidebar        ║
 ╚══════════════════════════════════════════╝
 ```
 
@@ -138,27 +155,36 @@ SpockChat is federated. Every person runs their own server. There is no central 
 
 ### Same WiFi (LAN)
 
-Share the **Network** address printed at startup (e.g. `http://192.168.1.42:3000`). Anyone on the same network can open it in their browser and register an account on your server, or you can point them at their own running instance.
+Share the **Network** address printed at startup (e.g. `http://192.168.1.42:3000`). Anyone on the same network can open it in their browser and register an account, then add you as a friend.
 
-### Different networks (across the internet)
+> **If your IP starts with `169.254.x.x`** — that is a link-local address, not a real LAN IP. It means your machine did not get a proper IP from the router. Disconnect and reconnect to WiFi, then restart SpockChat.
 
-You need to make your server reachable. Two options:
+### Different networks — Built-in Tunnel (v2.1+)
 
-**Option A — ngrok (easiest, no router config):**
-```bash
-npx ngrok http 3000
-```
-Copy the `https://xxxx.ngrok.io` URL and share it. Free tier is fine for personal use.
+SpockChat has a one-click tunnel built in. No port forwarding. No accounts. Works from any WiFi.
 
-**Option B — Port forwarding:**
-Forward port `3000` on your router to your machine's local IP. Share your public IP. Your friends connect to `http://YOUR_PUBLIC_IP:3000`.
+**Your side (hosting):**
+1. Start SpockChat (`npm start`)
+2. Click the **🌐 globe icon** in the top-right of the sidebar
+3. Wait 5–15 seconds — a green panel appears with a URL like `https://abc123.lhr.life`
+4. Click **📋 Copy URL** and send it to your friend over WhatsApp, Discord, etc.
+
+**Their side (connecting):**
+1. Click **Add Friend** (＋ button)
+2. Select the **🌐 Internet (Tunnel)** tab
+3. Paste the tunnel URL and enter your username
+4. Send the request — you get a notification and accept
+
+The tunnel uses your system SSH to create a reverse tunnel to [localhost.run](https://localhost.run) — a free public tunnel service. The URL changes each session. Stop the tunnel when you are done to close the public URL.
+
+> If port 22 is blocked on your network (some corporate WiFi), SpockChat automatically retries on port 443.
 
 ### The friend add flow
 
 1. Click **＋** in the sidebar header → **Add Friend**
-2. Enter their server address and their username
-3. They get a notification on their end
-4. Once accepted, you can invite each other to group chats
+2. Choose **🏠 Same Network** or **🌐 Internet (Tunnel)** tab
+3. Enter their server address and username
+4. They get a real-time notification and can accept
 
 ---
 
@@ -188,8 +214,9 @@ spockchat/
 │   ├── routes/
 │   │   ├── auth.js           # /api/auth — register, login, token validation
 │   │   ├── chats.js          # /api/chats — CRUD, messages, invites
-│   │   ├── friends.js        # /api/friends — add by IP, federation endpoint
-│   │   └── ai.js             # /api/ai — Ollama calls, model listing, status
+│   │   ├── friends.js        # /api/friends — add by IP or tunnel URL, federation
+│   │   ├── ai.js             # /api/ai — Ollama calls, model listing, status
+│   │   └── tunnel.js         # /api/tunnel — SSH tunnel management (v2.1+)
 │   └── socket/
 │       └── handlers.js       # Real-time events: messages, typing, @AI trigger
 ├── client/
@@ -237,6 +264,13 @@ spockchat/
 | GET | `/api/ai/status?host=...` | Check if Ollama is reachable |
 | POST | `/api/ai/ask` | Direct 1v1 query |
 
+### Tunnel (v2.1+)
+| Method | Path | Notes | Auth required |
+|---|---|---|---|
+| POST | `/api/tunnel/start` | Open SSH reverse tunnel, returns public URL | Yes |
+| DELETE | `/api/tunnel/stop` | Close the active tunnel | Yes |
+| GET | `/api/tunnel/status` | Check if tunnel is running and get current URL | Yes |
+
 ### Federation (peer-server calls)
 | Method | Path | Purpose |
 |---|---|---|
@@ -251,14 +285,14 @@ spockchat/
 - JWT tokens expire after 30 days
 - All data stays in a local SQLite file — nothing is transmitted to any third party
 - The federation endpoints (`/api/federation/*`) are unauthenticated by design — they only write to your local DB and emit socket events; they cannot read data
+- The tunnel creates a temporary public URL — **stop the tunnel** (click Stop in the sidebar panel) when you are done chatting across networks
 - **Change `JWT_SECRET` in `.env` before sharing your network address with anyone**
-- For public internet exposure, put SpockChat behind a reverse proxy (nginx, Caddy) with HTTPS
+- For permanent public internet exposure, put SpockChat behind a reverse proxy (nginx, Caddy) with HTTPS
+- `npm audit` reports **0 vulnerabilities** as of v2.1.1
 
 ---
 
 ## Roadmap
-
-This is v1.0.0. The foundation is stable. Here's what's coming:
 
 ### v1.1 — Quality of life
 - [ ] Message search across chat history
@@ -280,6 +314,27 @@ This is v1.0.0. The foundation is stable. Here's what's coming:
 - [ ] Chat import/export for moving between machines
 
 Have a feature idea? Open an issue or a discussion on GitHub.
+
+---
+
+## Changelog
+
+### v2.1.1 — Security & Cross-Network *(latest)*
+- **Added** built-in SSH tunnel (🌐 button in sidebar) — one click to get a public `https://xxxx.lhr.life` URL
+- **Added** tabbed Add Friend modal — separate flows for Same Network and Internet (Tunnel)
+- **Added** automatic port 443 fallback if port 22 is blocked by firewall
+- **Added** `/api/tunnel/start`, `/api/tunnel/stop`, `/api/tunnel/status` endpoints
+- **Fixed** 14 npm audit vulnerabilities — removed `localtunnel` and all deprecated transitive deps (`request`, `axios`, `hawk`, `boom`, `hoek`, `cryptiles`, `sntp`)
+- **Upgraded** `uuid` from v9 to v11.1.1
+- **Improved** friend-add error messages with specific hints per failure type
+
+### v1.0.0 — Foundation Release
+- 1v1 AI chat and group chat with up to 5 members
+- Real-time messaging via Socket.io
+- @AI mentions with 40-message context window
+- Local SQLite persistence, bcrypt auth, JWT sessions
+- Friend system with invite flow
+- Glassmorphism UI
 
 ---
 
