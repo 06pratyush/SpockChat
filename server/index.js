@@ -1,67 +1,143 @@
-require('dotenv').config();
+/**
+ * SpockChat entry point.
+ *
+ * Boot order is deliberate — each step can fail with a clear, actionable message
+ * rather than a stack trace, and nothing starts listening until the things it
+ * depends on are proven healthy.
+ *
+ *   1. install crash guards and signal handlers
+ *   2. validate configuration          (bad .env → explain and exit)
+ *   3. open the database, run migrations (locked/corrupt → explain and exit)
+ *   4. build the HTTP app
+ *   5. attach the realtime layer
+ *   6. start background workers
+ *   7. listen                           (port in use → explain and exit)
+ */
 
-const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const path = require('path');
-const { networkInterfaces } = require('os');
 
-const app = express();
-const server = http.createServer(app);
-const PORT = parseInt(process.env.PORT || 3000);
+const lifecycle = require('./core/lifecycle');
+lifecycle.install();
 
-// ─── SOCKET.IO ────────────────────────────────────────────────────────────────
-const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
-const registerSocketHandlers = require('./socket/handlers');
-const connectedUsers = registerSocketHandlers(io);
-app.set('io', io);
-app.set('connectedUsers', connectedUsers);
+const { config, warnings, assertValid } = require('./config');
+const { createLogger } = require('./core/logger');
 
-// ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'client')));
+const log = createLogger('boot');
 
-// ─── ROUTES ───────────────────────────────────────────────────────────────────
-app.use('/api/auth',       require('./routes/auth'));
-app.use('/api/chats',      require('./routes/chats'));
-app.use('/api/friends',    require('./routes/friends'));
-app.use('/api/ai',         require('./routes/ai'));
-app.use('/api/tunnel',     require('./routes/tunnel'));       // v2.1 — public tunneling
-app.use('/api/federation', require('./routes/friends'));      // peer-to-peer federation
-
-// ─── SERVER INFO ──────────────────────────────────────────────────────────────
-app.get('/api/info', (req, res) => {
-  res.json({ app: 'SpockChat', version: '2.1.0', localIP: getLocalIP(), port: PORT });
-});
-
-// ─── SPA FALLBACK ─────────────────────────────────────────────────────────────
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
-});
-
-// ─── START ────────────────────────────────────────────────────────────────────
-server.listen(PORT, '0.0.0.0', () => {
-  const ip = getLocalIP();
-  const pad = '192.168.xxx.xxx'.length - ip.length;
-  const padStr = ' '.repeat(Math.max(0, pad));
-
-  console.log(`\n╔══════════════════════════════════════════╗`);
-  console.log(`║           SpockChat v2.1.0               ║`);
-  console.log(`╠══════════════════════════════════════════╣`);
-  console.log(`║  Local:    http://localhost:${PORT}         ║`);
-  console.log(`║  Network:  http://${ip}:${PORT}${padStr}  ║`);
-  console.log(`║  Public:   Click 🌐 in the sidebar        ║`);
-  console.log(`╚══════════════════════════════════════════╝\n`);
-});
-
-function getLocalIP() {
-  const nets = networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) return net.address;
-    }
-  }
-  return 'localhost';
+function fail(message, hint) {
+  process.stderr.write(`\n✖ ${config?.app?.name || 'SpockChat'} could not start\n\n  ${message}\n`);
+  if (hint) process.stderr.write(`\n  💡 ${hint}\n`);
+  process.stderr.write('\n');
+  process.exit(1);
 }
+
+async function main() {
+  // 1–2. Configuration
+  try {
+    assertValid();
+  } catch (err) {
+    fail(err.message);
+  }
+  for (const warning of warnings) log.warn(warning);
+
+  // 3. Database
+  const db = require('./db');
+  try {
+    db.open();
+  } catch (err) {
+    fail(err.message, err.hint);
+  }
+
+  // 4. HTTP application
+  const { createApp } = require('./app');
+  const app = createApp();
+  const server = http.createServer(app);
+
+  // Slow-loris protection: a client that opens a socket and never finishes its
+  // headers used to be able to hold a connection open indefinitely.
+  server.headersTimeout = 20_000;
+  server.requestTimeout = 60_000;
+  server.keepAliveTimeout = 30_000;
+
+  // 5. Realtime
+  const realtime = require('./realtime');
+  realtime.attach(server);
+
+  // 6. Background workers
+  const federation = require('./services/federation.service');
+  federation.startOutboxWorker();
+
+  lifecycle.onShutdown('http-server', () =>
+    new Promise(resolve => {
+      server.close(() => resolve());
+      // Sockets idling in keep-alive would otherwise hold the close open.
+      setTimeout(resolve, 4_000).unref?.();
+    })
+  , { timeoutMs: 5_000 });
+
+  // 7. Listen
+  server.on('error', err => {
+    if (err.code === 'EADDRINUSE') {
+      fail(
+        `Port ${config.server.port} is already in use.`,
+        'Another SpockChat (or another program) is using it. Close it, or set PORT=3001 in your .env file.'
+      );
+    }
+    if (err.code === 'EACCES') {
+      fail(
+        `Permission denied binding to port ${config.server.port}.`,
+        config.server.port < 1024
+          ? 'Ports below 1024 need administrator rights. Use a port above 1024, e.g. PORT=3000.'
+          : 'The operating system refused that port. Another program may hold it exclusively, or ' +
+            'it may fall inside a reserved range (on Windows, check "netsh interface ipv4 show ' +
+            'excludedportrange protocol=tcp"). Pick a different PORT in your .env file.'
+      );
+    }
+    fail(`The HTTP server failed to start: ${err.message}`);
+  });
+
+  server.listen(config.server.port, config.server.host, () => {
+    printBanner();
+  });
+
+  return server;
+}
+
+function printBanner() {
+  const identity = require('./services/identity.service');
+  const info = identity.describe();
+  const WIDTH = 52; // interior columns between the box edges
+
+  // Emoji occupy two terminal columns but one JS char, so pad by display width
+  // or the right-hand border drifts.
+  const displayWidth = text => [...text].reduce((n, ch) => n + (ch.codePointAt(0) > 0x2100 ? 2 : 1), 0);
+  const row = text => `║${text}${' '.repeat(Math.max(0, WIDTH - displayWidth(text)))}║`;
+  const line = (label, value) => row(`  ${label.padEnd(9)} ${value}`);
+
+  const rows = [
+    '╔' + '═'.repeat(WIDTH) + '╗',
+    row(`  ${config.app.name} v${config.app.version}`),
+    '╠' + '═'.repeat(WIDTH) + '╣',
+    line('Local:', `http://localhost:${config.server.port}`),
+    line('Network:', info.lanUrl),
+    line('Public:', 'click 🌐 in the sidebar'),
+    line('Health:', `http://localhost:${config.server.port}/api/health/ready`),
+    '╚' + '═'.repeat(WIDTH) + '╝',
+  ];
+  process.stdout.write('\n' + rows.join('\n') + '\n\n');
+
+  for (const warning of info.warnings) log.warn(warning);
+  if (config.auth.jwtSecretIsEphemeral) {
+    log.warn('Sessions will not survive a restart until you set JWT_SECRET in .env');
+  }
+}
+
+if (require.main === module) {
+  main().catch(err => {
+    // Anything that escapes here is a boot bug, not a user error.
+    process.stderr.write(`\n✖ SpockChat crashed during startup:\n${err?.stack || err}\n\n`);
+    process.exit(1);
+  });
+}
+
+module.exports = { main };
