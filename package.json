@@ -1,23 +1,37 @@
 {
   "name": "spockchat",
-  "version": "2.1.1",
-  "description": "Local-first P2P AI chat web application with Ollama integration",
+  "version": "3.0.0",
+  "description": "Local-first, federated P2P AI chat with Ollama — resilient by design",
   "main": "server/index.js",
   "scripts": {
     "start": "node --experimental-sqlite server/index.js",
-    "dev": "node --experimental-sqlite --watch server/index.js"
+    "dev": "node --experimental-sqlite --watch server/index.js",
+    "test": "node --experimental-sqlite --test --test-concurrency=1 tests/*.test.js",
+    "test:chaos": "node --experimental-sqlite --test --test-concurrency=1 tests/chaos.test.js",
+    "health": "node -e \"fetch('http://localhost:'+(process.env.PORT||3000)+'/api/health/ready').then(r=>r.json()).then(j=>{console.log(JSON.stringify(j,null,2));process.exit(j.ready?0:1)}).catch(e=>{console.error('unreachable:',e.message);process.exit(1)})\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
-    "express": "^4.18.2",
+    "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "node-fetch": "^2.7.0",
-    "socket.io": "^4.7.2",
-    "uuid": "^11.1.1"
+    "socket.io": "^4.8.1"
   },
-  "engines": { "node": ">=22.5.0" },
-  "keywords": ["ai", "chat", "local", "ollama", "p2p"],
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "keywords": [
+    "ai",
+    "chat",
+    "local-first",
+    "ollama",
+    "p2p",
+    "federation",
+    "resilient"
+  ],
   "license": "AGPL-3.0"
 }
